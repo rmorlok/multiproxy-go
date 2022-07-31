@@ -4,13 +4,13 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"strings"
-	"os"
-	"fmt"
 	"net/url"
-	"io"
+	"os"
+	"strings"
 )
 
 var hosts []url.URL
@@ -36,20 +36,23 @@ func handleHTTP(w http.ResponseWriter, req *http.Request) {
 
 		// Combine the data to create a new URL
 		u := url.URL{
-			Scheme: h.Scheme,
-			Opaque: orig_url.Opaque,
-			User: h.User,
-			Host: h.Host,
-			Path: path,
+			Scheme:   h.Scheme,
+			Opaque:   orig_url.Opaque,
+			User:     h.User,
+			Host:     h.Host,
+			Path:     path,
 			RawQuery: orig_url.RawQuery,
 		}
 
 		log.Printf("Checking path %s", u.String())
 
 		// Update the request with the new URL
-		req.URL = &u
+		r, err := http.NewRequest(req.Method, u.String(), nil)
+		if err != nil {
+			continue
+		}
 
-		resp, err := http.DefaultTransport.RoundTrip(req)
+		resp, err := http.DefaultTransport.RoundTrip(r)
 		if err != nil {
 			continue
 		}
@@ -124,7 +127,7 @@ func main() {
 	log.Printf("Serving proxy on %s:%d", ip, port)
 
 	server := &http.Server{
-		Addr: fmt.Sprintf("%s:%d", ip, port),
+		Addr:    fmt.Sprintf("%s:%d", ip, port),
 		Handler: http.HandlerFunc(handleHTTP),
 		// Disable HTTP/2.
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
